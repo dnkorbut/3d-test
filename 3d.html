@@ -1,0 +1,198 @@
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name='viewport' content='width=device-width' />
+	<title>3d - Дима на ОБЛК</title>
+	<style>
+		body { margin: 0; padding: 0; }
+	</style>
+</head>
+<body>
+	<canvas id="c"></canvas>
+	<script>
+
+		function render_tri(ctx, col, v1, v2, v3) {
+			ctx.beginPath();
+			ctx.moveTo(v1.x * c.width, v1.y * c.height);
+			ctx.lineTo(v2.x * c.width, v2.y * c.height);
+			ctx.lineTo(v3.x * c.width, v3.y * c.height);
+			ctx.closePath();
+			ctx.strokeStyle = col;
+			ctx.stroke();
+		}
+
+		function mulmatrix4(m1, m2) { // ВСПМГ Умножение матриц
+			var m3 = [];
+
+			m3[0] = m1[0] * m2[0] + m1[4] * m2[1] + m1[8] * m2[2] + m1[12] * m2[3];
+			m3[4] = m1[0] * m2[4] + m1[4] * m2[5] + m1[8] * m2[6] + m1[12] * m2[7];
+			m3[8] = m1[0] * m2[8] + m1[4] * m2[9] + m1[8] * m2[10] + m1[12] * m2[11];
+			m3[12] = m1[0] * m2[12] + m1[4] * m2[13] + m1[8] * m2[14] + m1[12] * m2[15];
+
+			m3[1] = m1[1] * m2[0] + m1[5] * m2[1] + m1[9] * m2[2] + m1[13] * m2[3];
+			m3[5] = m1[1] * m2[4] + m1[5] * m2[5] + m1[9] * m2[6] + m1[13] * m2[7];
+			m3[9] = m1[1] * m2[8] + m1[5] * m2[9] + m1[9] * m2[10] + m1[13] * m2[11];
+			m3[13] = m1[1] * m2[12] + m1[5] * m2[13] + m1[9] * m2[14] + m1[13] * m2[15];
+
+			m3[2] = m1[2] * m2[0] + m1[6] * m2[1] + m1[10] * m2[2] + m1[14] * m2[3];
+			m3[6] = m1[2] * m2[4] + m1[6] * m2[5] + m1[10] * m2[6] + m1[14] * m2[7];
+			m3[10] = m1[2] * m2[8] + m1[6] * m2[9] + m1[10] * m2[10] + m1[14] * m2[11];
+			m3[14] = m1[2] * m2[12] + m1[6] * m2[13] + m1[10] * m2[14] + m1[14] * m2[15];
+
+			m3[3] = m1[3] * m2[0] + m1[7] * m2[1] + m1[11] * m2[2] + m1[15] * m2[3];
+			m3[7] = m1[3] * m2[4] + m1[7] * m2[5] + m1[11] * m2[6] + m1[15] * m2[7];
+			m3[11] = m1[3] * m2[8] + m1[7] * m2[9] + m1[11] * m2[10] + m1[15] * m2[11];
+			m3[15] = m1[3] * m2[12] + m1[7] * m2[13] + m1[11] * m2[14] + m1[15] * m2[15];
+
+			return m3;
+		}
+
+		function mulmatrix_vector(m, v) {
+			var rv = {};
+
+			//alert('Было: ' + v.x  + ', ' + v.y + ', ' + v.z + ', ' + v.w);
+
+			rv.x = m[0] * v.x + m[4] * v.y + m[8] * v.z + m[12];
+			rv.y = m[1] * v.x + m[5] * v.y + m[9] * v.z + m[13];
+			rv.z = m[2] * v.x + m[6] * v.y + m[10] * v.z + m[14];
+			rv.w = m[3] * v.x + m[7] * v.y + m[11] * v.z + m[15];
+
+			//alert('Стало: ' + rv.x  + ', ' + rv.y + ', ' + rv.z + ', ' + rv.w);
+
+			rv.x = rv.x / rv.w / 2 + 0.5;
+			rv.y = rv.y / rv.w / 2 + 0.5;
+			rv.z = rv.z / rv.w / 2 + 0.5;
+
+			//alert('Экран: ' + rv.x  + ', ' + rv.y + ', ' + rv.z + ', ' + rv.w);
+
+			return rv;
+		}
+
+		var c = document.getElementById('c');
+		var ctx = c.getContext("2d");
+
+		c.width = window.innerWidth;
+		c.height = window.innerHeight;
+
+		var x = 0;
+		var y = 0;
+		var z = 0;
+
+		function redraw() {
+
+			ctx.fillStyle = '#def';
+			ctx.fillRect(0, 0, c.width, c.height);
+
+			var basis = [
+				1, 0, 0, 0,
+				0, 1, 0, 0,
+				0, 0, 1, 0,
+				0, 0, 0, 1
+			];
+			var perspective = [
+				1, 0, 0, 0,
+				0, 1, 0, 0,
+				0, 0, 1, 1, // <-- point perspective projection
+				0, 0, 0, 1
+			];
+
+			var translation = [
+				1, 0, 0, 0,
+				0, 1, 0, 0,
+				0, 0, 1, 0,
+				-x, -y, -z, 1
+			];
+
+
+	// 		// Тут будет треугольник
+	// 		var tri = [{x: 1, y: 2, z: 3}, {x: 10, y: 1, z: 1}, {x: 5, y: 5, z: 1}];
+	// 		render_tri(ctx, '#000', tri[0], tri[1], tri[2]);
+	// 		render_tri(ctx, '#f00', mulmatrix_vector(perspective, tri[0]), mulmatrix_vector(perspective, tri[1]), mulmatrix_vector(perspective, tri[2]));
+	//
+	// 		tri = [{x: 1, y: 1, z: 10}, {x: 10, y: 1, z: 10}, {x: 5, y: 5, z: 10}];
+	// 		render_tri(ctx, '#00f', tri[0], tri[1], tri[2]);
+	// 		render_tri(ctx, '#0f0', mulmatrix_vector(perspective, tri[0]), mulmatrix_vector(perspective, tri[1]), mulmatrix_vector(perspective, tri[2]));
+
+			var tri = [];
+
+			tri[0] = {x: 1.313345, y: 0.001850, z: 2.383595};
+			tri[1] = {x: 1.313345, y: 0.001849, z: 4.383595};
+			tri[2] = {x: 1.313345, y: 2.001850, z: 4.383596};
+
+			tri[3] = {x: 1.313345, y: 0.001850, z: 2.383595};
+			tri[4] = {x: 1.313345, y: 2.001850, z: 4.383596};
+			tri[5] = {x: 1.313345, y: 2.001851, z: 2.383597};
+
+			tri[6] = {x: 3.313345, y: 0.001850, z: 2.383595};
+			tri[7] = {x: 1.313345, y: 0.001850, z: 2.383595};
+			tri[8] = {x: 1.313345, y: 2.001851, z: 2.383597};
+
+			tri[9] = {x: 3.313345, y: 0.001850, z: 2.383595};
+			tri[10] = {x: 1.313345, y: 2.001851, z: 2.383597};
+			tri[11] = {x: 3.313345, y: 2.001851, z: 2.383597};
+
+			tri[12] = {x: 3.313345, y: 2.001851, z: 2.383597};
+			tri[13] = {x: 3.313345, y: 2.001850, z: 4.383596};
+			tri[14] = {x: 3.313345, y: 0.001849, z: 4.383595};
+
+			tri[15] = {x: 3.313345, y: 2.001851, z: 2.383597};
+			tri[16] = {x: 3.313345, y: 0.001849, z: 4.383595};
+			tri[17] = {x: 3.313345, y: 0.001850, z: 2.383595};
+
+			tri[18] = {x: 3.313345, y: 0.001849, z: 4.383595};
+			tri[19] = {x: 1.313345, y: 0.001849, z: 4.383595};
+			tri[20] = {x: 3.313345, y: 2.001850, z: 4.383596};
+
+			tri[21] = {x: 1.313345, y: 0.001849, z: 4.383595};
+			tri[22] = {x: 3.313345, y: 2.001850, z: 4.383596};
+			tri[23] = {x: 1.313345, y: 2.001850, z: 4.383596};
+
+			tri[24] = {x: 1.313345, y: 0.001849, z: 4.383595};
+			tri[25] = {x: 1.313345, y: 0.001850, z: 2.383595};
+			tri[26] = {x: 3.313345, y: 0.001850, z: 2.383595};
+
+			tri[27] = {x: 1.313345, y: 0.001849, z: 4.383595};
+			tri[28] = {x: 3.313345, y: 0.001850, z: 2.383595};
+			tri[29] = {x: 3.313345, y: 0.001849, z: 4.383595};
+
+			tri[30] = {x: 3.313345, y: 2.001850, z: 4.383596};
+			tri[31] = {x: 3.313345, y: 2.001851, z: 2.383597};
+			tri[32] = {x: 1.313345, y: 2.001851, z: 2.383597};
+
+			tri[33] = {x: 3.313345, y: 2.001850, z: 4.383596};
+			tri[34] = {x: 1.313345, y: 2.001851, z: 2.383597};
+			tri[35] = {x: 1.313345, y: 2.001850, z: 4.383596};
+
+			basis = mulmatrix4(perspective, translation);
+
+			var i;
+			for(i = 0; i < 36; i += 3) {
+				render_tri(ctx, '#f00', mulmatrix_vector(basis, tri[i]), mulmatrix_vector(basis, tri[i + 1]), mulmatrix_vector(basis, tri[i + 2]));
+			}
+		}
+
+		redraw();
+
+		window.onkeydown = function(e) {
+			var kc = e.keyCode?e.keyCode:e.charCode;
+			if(kc == 39) { // left
+				x -= 0.5;
+			}else if(kc == 37) { // right
+				x += 0.5;
+			}else if(kc == 40) { // up
+				z += 0.5;
+			}else if(kc == 38) { // down
+				z -= 0.5;
+			}else if(kc == 107 || kc == 187) { // +
+				y += 0.5;
+			}else if(kc == 109 || kc == 189) { // -
+				y -= 0.5;
+			}
+			redraw();
+			console.log('x: ' + x + '; y: ' + y + '; z: ' + z);
+		}
+	</script>
+
+<!-- Yandex.Metrika counter --> <script type="text/javascript"> (function (d, w, c) { (w[c] = w[c] || []).push(function() { try { w.yaCounter31678721 = new Ya.Metrika({ id:31678721, clickmap:true, trackLinks:true, accurateTrackBounce:true }); } catch(e) { } }); var n = d.getElementsByTagName("script")[0], s = d.createElement("script"), f = function () { n.parentNode.insertBefore(s, n); }; s.type = "text/javascript"; s.async = true; s.src = "https://mc.yandex.ru/metrika/watch.js"; if (w.opera == "[object Opera]") { d.addEventListener("DOMContentLoaded", f, false); } else { f(); } })(document, window, "yandex_metrika_callbacks"); </script> <noscript><div><img src="https://mc.yandex.ru/watch/31678721" style="position:absolute; left:-9999px;" alt="" /></div></noscript> <!-- /Yandex.Metrika counter -->
+</body>
+</html>
